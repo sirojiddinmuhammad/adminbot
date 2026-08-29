@@ -19,13 +19,12 @@ async def start_buyrugi(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
         "Assalomu alaykum! Admin botiga xush kelibsiz.\n\n"
-        "Yangi talaba qo'shish uchun pastdagi ☰ menyudan "
-        "/yangi_talaba buyrug'ini tanlang."
+        "Yangi talaba qo'shish uchun pastdagi tugmani bosing.",
+        reply_markup=keyboards.asosiy_pastki_klaviatura(),
     )
 
 
-@router.message(Command("yangi_talaba"))
-async def yangi_talaba_buyrugi(message: Message, state: FSMContext) -> None:
+async def _yangi_talaba_boshlash(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
         "Yangi talabami yoki mavjud talabami?",
@@ -34,13 +33,23 @@ async def yangi_talaba_buyrugi(message: Message, state: FSMContext) -> None:
     await state.set_state(TalabaQoshish.turi_tanlash)
 
 
+@router.message(F.text == keyboards.YANGI_TALABA_MATNI)
+async def yangi_talaba_tugmasi(message: Message, state: FSMContext) -> None:
+    await _yangi_talaba_boshlash(message, state)
+
+
+@router.message(Command("yangi_talaba"))
+async def yangi_talaba_buyrugi(message: Message, state: FSMContext) -> None:
+    await _yangi_talaba_boshlash(message, state)
+
+
 @router.callback_query(F.data == "bekor")
 async def bekor_qilish(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.clear()
     await callback.message.answer(
         "❌ Bekor qilindi. Hech narsa saqlanmadi.\n"
-        "Qaytadan boshlash uchun /yangi_talaba buyrug'ini bosing."
+        "Qaytadan boshlash uchun pastdagi tugmani bosing."
     )
 
 
@@ -142,7 +151,14 @@ async def mavjud_qidiruv(message: Message, state: FSMContext) -> None:
         await message.answer("❌ Kamida 2 ta harf kiriting:")
         return
 
-    natijalar = await notion_api.talaba_qidirish(ism_qismi)
+    try:
+        natijalar = await notion_api.talaba_qidirish(ism_qismi)
+    except Exception as xato:
+        await message.answer(
+            f"❌ Qidiruvda xatolik: {xato}\n"
+            "Notion integratsiyasi Talabalar bazasiga ulanganini tekshiring."
+        )
+        return
     await state.update_data(ism=ism_qismi)
 
     if not natijalar:
@@ -206,7 +222,14 @@ async def _ustoz_royxatini_korsat(target, state: FSMContext, sahifa: int = 0) ->
     data = await state.get_data()
     ustozlar = data.get("ustozlar_list")
     if ustozlar is None:
-        ustozlar = await notion_api.faol_ustozlar()
+        try:
+            ustozlar = await notion_api.faol_ustozlar()
+        except Exception as xato:
+            await target.answer(
+                f"❌ Ustozlar ro'yxatini olishda xatolik: {xato}\n"
+                "Notion integratsiyasi Ustozlar bazasiga ulanganini tekshiring."
+            )
+            return
         await state.update_data(ustozlar_list=ustozlar)
 
     if not ustozlar:
@@ -246,7 +269,14 @@ async def _guruh_royxatini_korsat(target, state: FSMContext, sahifa: int = 0) ->
     data = await state.get_data()
     guruhlar = data.get("guruhlar_list")
     if guruhlar is None:
-        guruhlar = await notion_api.ustoz_faol_guruhlari(data["cur_ustoz_id"])
+        try:
+            guruhlar = await notion_api.ustoz_faol_guruhlari(data["cur_ustoz_id"])
+        except Exception as xato:
+            await target.answer(
+                f"❌ Guruhlar ro'yxatini olishda xatolik: {xato}\n"
+                "Notion integratsiyasi Guruhlar bazasiga ulanganini tekshiring."
+            )
+            return
         await state.update_data(guruhlar_list=guruhlar)
 
     if not guruhlar:
@@ -491,7 +521,7 @@ async def keyingi_tugatish(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await callback.message.answer(
         "Rahmat! Ishingiz muvaffaqiyatli yakunlandi. ✅\n"
-        "Yana talaba qo'shish uchun /yangi_talaba buyrug'ini bosing."
+        "Yana talaba qo'shish uchun pastdagi tugmani bosing."
     )
     await state.clear()
 

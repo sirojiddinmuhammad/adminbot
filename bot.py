@@ -18,7 +18,6 @@ async def _buyruqlar_menyusini_ornat(bot: Bot) -> None:
     await bot.set_my_commands(
         [
             BotCommand(command="start", description="Botni ishga tushirish"),
-            BotCommand(command="yangi_talaba", description="➕ Yangi talaba qo'shish"),
         ]
     )
 

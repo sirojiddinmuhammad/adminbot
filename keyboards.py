@@ -1,15 +1,19 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from config import SAHIFA_HAJMI
 
 BEKOR_TUGMASI = InlineKeyboardButton(text="❌ Bekor qilish", callback_data="bekor")
 
+YANGI_TALABA_MATNI = "➕ Yangi talaba"
 
-def asosiy_menyu_klaviaturasi() -> InlineKeyboardMarkup:
-    kb = InlineKeyboardBuilder()
-    kb.button(text="➕ Yangi talaba", callback_data="menyu:yangi_talaba")
-    return kb.as_markup()
+
+def asosiy_pastki_klaviatura() -> ReplyKeyboardMarkup:
+    """Xabar yozish maydoni ustida doimiy turadigan tugma."""
+    kb = ReplyKeyboardBuilder()
+    kb.button(text=YANGI_TALABA_MATNI)
+    kb.adjust(1)
+    return kb.as_markup(resize_keyboard=True)
 
 
 def turi_tanlash_klaviaturasi() -> InlineKeyboardMarkup:
