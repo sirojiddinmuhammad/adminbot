@@ -18,16 +18,16 @@ router = Router()
 async def start_buyrugi(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
-        "Assalomu alaykum! Admin botiga xush kelibsiz.",
-        reply_markup=keyboards.asosiy_menyu_klaviaturasi(),
+        "Assalomu alaykum! Admin botiga xush kelibsiz.\n\n"
+        "Yangi talaba qo'shish uchun pastdagi ☰ menyudan "
+        "/yangi_talaba buyrug'ini tanlang."
     )
 
 
-@router.callback_query(F.data == "menyu:yangi_talaba")
-async def menyu_yangi_talaba(callback: CallbackQuery, state: FSMContext) -> None:
-    await callback.answer()
+@router.message(Command("yangi_talaba"))
+async def yangi_talaba_buyrugi(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.answer(
+    await message.answer(
         "Yangi talabami yoki mavjud talabami?",
         reply_markup=keyboards.turi_tanlash_klaviaturasi(),
     )
@@ -39,8 +39,8 @@ async def bekor_qilish(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.clear()
     await callback.message.answer(
-        "❌ Bekor qilindi. Hech narsa saqlanmadi.",
-        reply_markup=keyboards.asosiy_menyu_klaviaturasi(),
+        "❌ Bekor qilindi. Hech narsa saqlanmadi.\n"
+        "Qaytadan boshlash uchun /yangi_talaba buyrug'ini bosing."
     )
 
 
@@ -490,8 +490,8 @@ async def xulosa_tasdiqlandi(callback: CallbackQuery, state: FSMContext) -> None
 async def keyingi_tugatish(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await callback.message.answer(
-        "Rahmat! Ishingiz muvaffaqiyatli yakunlandi. ✅",
-        reply_markup=keyboards.asosiy_menyu_klaviaturasi(),
+        "Rahmat! Ishingiz muvaffaqiyatli yakunlandi. ✅\n"
+        "Yana talaba qo'shish uchun /yangi_talaba buyrug'ini bosing."
     )
     await state.clear()
 

@@ -5,11 +5,22 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import BotCommand
 
 from config import ADMIN_ID, BOT_TOKEN
 from handlers import router
 
 logging.basicConfig(level=logging.INFO)
+
+
+async def _buyruqlar_menyusini_ornat(bot: Bot) -> None:
+    """Telegram'ning "☰ Menyu" ro'yxatiga buyruqlarni chiqaradi."""
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Botni ishga tushirish"),
+            BotCommand(command="yangi_talaba", description="➕ Yangi talaba qo'shish"),
+        ]
+    )
 
 
 async def main() -> None:
@@ -23,6 +34,7 @@ async def main() -> None:
     dp.include_router(router)
 
     await bot.delete_webhook(drop_pending_updates=True)
+    await _buyruqlar_menyusini_ornat(bot)
     await dp.start_polling(bot)
 
 
