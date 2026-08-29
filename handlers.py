@@ -11,6 +11,107 @@ router = Router()
 
 
 # =========================================================
+# Qadamlar tarixi ("Orqaga" tugmasi uchun)
+# =========================================================
+
+async def _tarixga_qoshish(state: FSMContext, qadam: str) -> None:
+    data = await state.get_data()
+    tarix = data.get("qadam_tarixi", [])
+    tarix.append(qadam)
+    await state.update_data(qadam_tarixi=tarix)
+
+
+async def _orqaga_qadam(state: FSMContext):
+    data = await state.get_data()
+    tarix = data.get("qadam_tarixi", [])
+    if not tarix:
+        return None
+    oldingi = tarix.pop()
+    await state.update_data(qadam_tarixi=tarix)
+    return oldingi
+
+
+async def _qadamni_korsat(qadam: str, target, state: FSMContext) -> None:
+    """Berilgan tag bo'yicha o'sha qadamning ekranini qayta ko'rsatadi."""
+    if qadam == "turi_tanlash":
+        await target.answer(
+            "Yangi talabami yoki mavjud talabami?",
+            reply_markup=keyboards.turi_tanlash_klaviaturasi(),
+        )
+        await state.set_state(TalabaQoshish.turi_tanlash)
+
+    elif qadam == "ism_kiritish":
+        await target.answer(
+            "👤 Talaba ismini kiriting:", reply_markup=keyboards.matn_kiritish_klaviaturasi()
+        )
+        await state.set_state(TalabaQoshish.ism_kiritish)
+
+    elif qadam == "telegram_id_kutish":
+        await target.answer(
+            "🆔 Telegram ID (ixtiyoriy):\n"
+            "Talabaning istalgan xabarini forward qiling, yoki ID raqamini yozing.",
+            reply_markup=keyboards.tgid_klaviaturasi(),
+        )
+        await state.set_state(TalabaQoshish.telegram_id_kutish)
+
+    elif qadam == "mavjud_qidirish":
+        await target.answer(
+            "🔎 Qidirish uchun talaba ismini kiriting:",
+            reply_markup=keyboards.matn_kiritish_klaviaturasi(),
+        )
+        await state.set_state(TalabaQoshish.mavjud_qidirish)
+
+    elif qadam == "mavjud_tanlash":
+        data = await state.get_data()
+        natijalar = data.get("mavjud_list")
+        if natijalar:
+            matn = keyboards.raqamli_royxat_matni("🔎 Topilgan talabalar:", natijalar, "ism", 0)
+            kb = keyboards.raqamli_royxat_klaviaturasi(natijalar, 0, "talaba", "page:mavjud")
+            await target.answer(matn, reply_markup=kb)
+            await state.set_state(TalabaQoshish.mavjud_tanlash)
+        else:
+            await _qadamni_korsat("mavjud_qidirish", target, state)
+
+    elif qadam == "ustoz_tanlash":
+        await _ustoz_royxatini_korsat(target, state)
+
+    elif qadam == "guruh_tanlash":
+        await _guruh_royxatini_korsat(target, state)
+
+    elif qadam == "sana_kutish":
+        await target.answer(
+            "📅 Boshlagan sanani kiriting:\n"
+            "Bugun bo'lsa tugmani bosing, aks holda KK.OO.YYYY formatda yozing "
+            "(masalan 25.08.2026).",
+            reply_markup=keyboards.sana_klaviaturasi(),
+        )
+        await state.set_state(TalabaQoshish.sana_kutish)
+
+    elif qadam == "tolov_kutish":
+        await target.answer(
+            "💵 Dastlabki to'lovni kiriting (so'm):",
+            reply_markup=keyboards.tolov_klaviaturasi(),
+        )
+        await state.set_state(TalabaQoshish.tolov_kutish)
+
+    elif qadam == "yana_guruh":
+        await target.answer(
+            "➕ Yana guruhga ham yozamizmi?", reply_markup=keyboards.yana_guruh_klaviaturasi()
+        )
+        await state.set_state(TalabaQoshish.yana_guruh)
+
+
+@router.callback_query(F.data == "orqaga")
+async def orqaga_qilish(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    qadam = await _orqaga_qadam(state)
+    if not qadam:
+        await callback.message.answer("⚠️ Bu birinchi qadam, orqaga qaytish joyi yo'q.")
+        return
+    await _qadamni_korsat(qadam, callback.message, state)
+
+
+# =========================================================
 # Boshlanish / asosiy menyu / bekor qilish
 # =========================================================
 
@@ -60,16 +161,25 @@ async def bekor_qilish(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(TalabaQoshish.turi_tanlash, F.data == "turi:yangi")
 async def turi_yangi(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
-    await state.update_data(is_new=True, yozilishlar=[], guruh_belgilangan=False)
-    await callback.message.answer("👤 Talaba ismini kiriting:")
+    await state.update_data(
+        is_new=True, yozilishlar=[], guruh_belgilangan=False, qadam_tarixi=["turi_tanlash"]
+    )
+    await callback.message.answer(
+        "👤 Talaba ismini kiriting:", reply_markup=keyboards.matn_kiritish_klaviaturasi()
+    )
     await state.set_state(TalabaQoshish.ism_kiritish)
 
 
 @router.callback_query(TalabaQoshish.turi_tanlash, F.data == "turi:mavjud")
 async def turi_mavjud(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
-    await state.update_data(is_new=False, yozilishlar=[], guruh_belgilangan=False)
-    await callback.message.answer("🔎 Qidirish uchun talaba ismini kiriting:")
+    await state.update_data(
+        is_new=False, yozilishlar=[], guruh_belgilangan=False, qadam_tarixi=["turi_tanlash"]
+    )
+    await callback.message.answer(
+        "🔎 Qidirish uchun talaba ismini kiriting:",
+        reply_markup=keyboards.matn_kiritish_klaviaturasi(),
+    )
     await state.set_state(TalabaQoshish.mavjud_qidirish)
 
 
@@ -84,6 +194,7 @@ async def ism_qabul(message: Message, state: FSMContext) -> None:
         await message.answer("❌ Ism juda qisqa. Qaytadan kiriting:")
         return
     await state.update_data(ism=ism, talaba_id=None)
+    await _tarixga_qoshish(state, "ism_kiritish")
     await message.answer(
         "🆔 Telegram ID (ixtiyoriy):\n"
         "Talabaning istalgan xabarini forward qiling, yoki ID raqamini yozing.",
@@ -92,7 +203,8 @@ async def ism_qabul(message: Message, state: FSMContext) -> None:
     await state.set_state(TalabaQoshish.telegram_id_kutish)
 
 
-async def _telegram_id_dan_keyin(target, state: FSMContext) -> None:
+async def _keyingi_qadamga_ot(target, state: FSMContext) -> None:
+    """Ustoz/Guruh oldindan belgilangan bo'lsa Sana so'raladi, aks holda Ustoz ro'yxati."""
     data = await state.get_data()
     if data.get("guruh_belgilangan"):
         await target.answer(
@@ -104,6 +216,55 @@ async def _telegram_id_dan_keyin(target, state: FSMContext) -> None:
         await state.set_state(TalabaQoshish.sana_kutish)
     else:
         await _ustoz_royxatini_korsat(target, state)
+
+
+async def _duplikat_tekshir(target, state: FSMContext) -> bool:
+    """Takroriy talaba topilsa True qaytaradi va jarayon shu yerda to'xtaydi."""
+    data = await state.get_data()
+    ism = data["ism"]
+    telegram_id = data.get("telegram_id")
+
+    if telegram_id:
+        try:
+            mos = await notion_api.telegram_id_boyicha_qidirish(telegram_id)
+        except Exception:
+            mos = []
+        if mos:
+            talaba = mos[0]
+            await state.update_data(duplikat_talaba_id=talaba["id"], duplikat_talaba_ism=talaba["ism"])
+            await target.answer(
+                f"⚠️ Bu Telegram ID allaqachon bazada: {talaba['ism']}.\n"
+                "Bir kishi ikki marta ro'yxatga tushib qolmasligi uchun tekshiring.",
+                reply_markup=keyboards.duplikat_tgid_klaviaturasi(),
+            )
+            return True
+
+    try:
+        mos = await notion_api.talaba_qidirish(ism)
+    except Exception:
+        mos = []
+    aniq_mos = [t for t in mos if t["ism"].strip().lower() == ism.strip().lower()]
+    if aniq_mos:
+        await state.update_data(duplikat_royxat=aniq_mos)
+        matn = keyboards.raqamli_royxat_matni(
+            f"⚠️ \"{ism}\" nomli talaba(lar) allaqachon bazada bor:", aniq_mos, "ism", 0
+        )
+        matn += "\n\nBu boshqa odammi, yoki xato yozildimi?"
+        kb = keyboards.duplikat_ism_klaviaturasi(aniq_mos)
+        await target.answer(matn, reply_markup=kb)
+        return True
+
+    return False
+
+
+async def _telegram_id_dan_keyin(target, state: FSMContext) -> None:
+    data = await state.get_data()
+    if data["is_new"] and not data.get("talaba_id"):
+        toxtatildi = await _duplikat_tekshir(target, state)
+        if toxtatildi:
+            return
+    await _tarixga_qoshish(state, "telegram_id_kutish")
+    await _keyingi_qadamga_ot(target, state)
 
 
 @router.callback_query(TalabaQoshish.telegram_id_kutish, F.data == "tgid:otkazish")
@@ -140,6 +301,37 @@ async def telegram_id_qabul(message: Message, state: FSMContext) -> None:
     await _telegram_id_dan_keyin(message, state)
 
 
+# ---- Duplikat ekranidagi tanlovlar ----
+
+@router.callback_query(TalabaQoshish.telegram_id_kutish, F.data == "duplikat:mavjud_tgid")
+async def duplikat_mavjud_tgid(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    data = await state.get_data()
+    await state.update_data(
+        is_new=False, talaba_id=data["duplikat_talaba_id"], ism=data["duplikat_talaba_ism"]
+    )
+    await _tarixga_qoshish(state, "telegram_id_kutish")
+    await _keyingi_qadamga_ot(callback.message, state)
+
+
+@router.callback_query(TalabaQoshish.telegram_id_kutish, F.data == "duplikat:baribir_yangi")
+async def duplikat_baribir_yangi(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    await _tarixga_qoshish(state, "telegram_id_kutish")
+    await _keyingi_qadamga_ot(callback.message, state)
+
+
+@router.callback_query(TalabaQoshish.telegram_id_kutish, F.data.startswith("duplikat_tanlash:"))
+async def duplikat_tanlash(callback: CallbackQuery, state: FSMContext) -> None:
+    await callback.answer()
+    idx = int(callback.data.split(":")[1])
+    data = await state.get_data()
+    talaba = data["duplikat_royxat"][idx]
+    await state.update_data(is_new=False, talaba_id=talaba["id"], ism=talaba["ism"])
+    await _tarixga_qoshish(state, "telegram_id_kutish")
+    await _keyingi_qadamga_ot(callback.message, state)
+
+
 # =========================================================
 # Mavjud talaba: qidirish va tanlash
 # =========================================================
@@ -159,9 +351,12 @@ async def mavjud_qidiruv(message: Message, state: FSMContext) -> None:
             "Notion integratsiyasi Talabalar bazasiga ulanganini tekshiring."
         )
         return
+
     await state.update_data(ism=ism_qismi)
+    await _tarixga_qoshish(state, "mavjud_qidirish")
 
     if not natijalar:
+        await state.update_data(mavjud_list=None)
         await message.answer(
             f"❌ \"{ism_qismi}\" bo'yicha talaba topilmadi.",
             reply_markup=keyboards.topilmadi_klaviaturasi(),
@@ -194,6 +389,7 @@ async def mavjud_talaba_callback(callback: CallbackQuery, state: FSMContext) -> 
 
     if qism == "yangi_sifatida":
         await state.update_data(is_new=True, talaba_id=None, telegram_id=None)
+        await _tarixga_qoshish(state, "mavjud_tanlash")
         await callback.message.answer(
             "🆔 Telegram ID (ixtiyoriy):\n"
             "Talabaning istalgan xabarini forward qiling, yoki ID raqamini yozing.",
@@ -203,7 +399,9 @@ async def mavjud_talaba_callback(callback: CallbackQuery, state: FSMContext) -> 
         return
 
     if qism == "qayta_qidirish":
-        await callback.message.answer("🔎 Qidirish uchun ismni kiriting:")
+        await callback.message.answer(
+            "🔎 Qidirish uchun ismni kiriting:", reply_markup=keyboards.matn_kiritish_klaviaturasi()
+        )
         await state.set_state(TalabaQoshish.mavjud_qidirish)
         return
 
@@ -211,6 +409,7 @@ async def mavjud_talaba_callback(callback: CallbackQuery, state: FSMContext) -> 
     data = await state.get_data()
     talaba = data["mavjud_list"][idx]
     await state.update_data(talaba_id=talaba["id"], ism=talaba["ism"], telegram_id=None)
+    await _tarixga_qoshish(state, "mavjud_tanlash")
     await _ustoz_royxatini_korsat(callback.message, state)
 
 
@@ -258,6 +457,7 @@ async def ustoz_tanlandi(callback: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(
         cur_ustoz_id=ustoz["id"], cur_ustoz_ism=ustoz["ism"], guruhlar_list=None
     )
+    await _tarixga_qoshish(state, "ustoz_tanlash")
     await _guruh_royxatini_korsat(callback.message, state)
 
 
@@ -308,6 +508,7 @@ async def guruh_tanlandi(callback: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     guruh = data["guruhlar_list"][idx]
     await state.update_data(cur_guruh_id=guruh["id"], cur_guruh_nomi=guruh["nomi"])
+    await _tarixga_qoshish(state, "guruh_tanlash")
     await callback.message.answer(
         "📅 Boshlagan sanani kiriting:\n"
         "Bugun bo'lsa tugmani bosing, aks holda KK.OO.YYYY formatda yozing "
@@ -325,6 +526,7 @@ async def _sanadan_keyin(target, state: FSMContext, iso_sana: str) -> None:
     await state.update_data(cur_sana=iso_sana)
     data = await state.get_data()
     if data["is_new"]:
+        await _tarixga_qoshish(state, "sana_kutish")
         await target.answer(
             "💵 Dastlabki to'lovni kiriting (so'm):",
             reply_markup=keyboards.tolov_klaviaturasi(),
@@ -332,6 +534,7 @@ async def _sanadan_keyin(target, state: FSMContext, iso_sana: str) -> None:
         await state.set_state(TalabaQoshish.tolov_kutish)
     else:
         await _yozilish_qoshish(state, tolov=None)
+        await _tarixga_qoshish(state, "sana_kutish")
         await _yana_guruh_sora(target, state)
 
 
@@ -379,6 +582,7 @@ async def _yana_guruh_sora(target, state: FSMContext) -> None:
 async def tolov_yoq(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await _yozilish_qoshish(state, tolov=None)
+    await _tarixga_qoshish(state, "tolov_kutish")
     await _yana_guruh_sora(callback.message, state)
 
 
@@ -393,6 +597,7 @@ async def tolov_qolda(message: Message, state: FSMContext) -> None:
         await message.answer("❌ Summani musbat raqam bilan kiriting, masalan: 500000")
         return
     await _yozilish_qoshish(state, tolov=summa)
+    await _tarixga_qoshish(state, "tolov_kutish")
     await _yana_guruh_sora(message, state)
 
 
@@ -411,12 +616,14 @@ async def yana_guruh_ha(callback: CallbackQuery, state: FSMContext) -> None:
         cur_sana=None,
         guruhlar_list=None,
     )
+    await _tarixga_qoshish(state, "yana_guruh")
     await _ustoz_royxatini_korsat(callback.message, state)
 
 
 @router.callback_query(TalabaQoshish.yana_guruh, F.data == "yana_guruh:yoq")
 async def yana_guruh_yoq(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
+    await _tarixga_qoshish(state, "yana_guruh")
     await _xulosa_korsat(callback.message, state)
 
 
@@ -505,7 +712,9 @@ async def xulosa_tasdiqlandi(callback: CallbackQuery, state: FSMContext) -> None
 
     await message.answer("🎉 Jarayon yakunlandi.")
 
-    await state.update_data(shu_guruh_id=songi_guruh_id, shu_guruh_nomi=songi_guruh_nomi)
+    await state.update_data(
+        shu_guruh_id=songi_guruh_id, shu_guruh_nomi=songi_guruh_nomi, qadam_tarixi=[]
+    )
     await message.answer(
         "Yana talaba qo'shamizmi?", reply_markup=keyboards.keyingi_talaba_klaviaturasi()
     )
@@ -531,8 +740,10 @@ async def keyingi_boshqa_guruh(callback: CallbackQuery, state: FSMContext) -> No
     await callback.answer()
     data = await state.get_data()
     await state.set_data({"ustozlar_list": data.get("ustozlar_list")})
-    await state.update_data(is_new=True, yozilishlar=[], guruh_belgilangan=False)
-    await callback.message.answer("👤 Talaba ismini kiriting:")
+    await state.update_data(is_new=True, yozilishlar=[], guruh_belgilangan=False, qadam_tarixi=[])
+    await callback.message.answer(
+        "👤 Talaba ismini kiriting:", reply_markup=keyboards.matn_kiritish_klaviaturasi()
+    )
     await state.set_state(TalabaQoshish.ism_kiritish)
 
 
@@ -556,6 +767,10 @@ async def keyingi_shu_guruh(callback: CallbackQuery, state: FSMContext) -> None:
         guruh_belgilangan=True,
         shu_guruh_id=shu_guruh_id,
         shu_guruh_nomi=shu_guruh_nomi,
+        qadam_tarixi=[],
     )
-    await callback.message.answer(f"👤 Talaba ismini kiriting ({shu_guruh_nomi} guruhiga yoziladi):")
+    await callback.message.answer(
+        f"👤 Talaba ismini kiriting ({shu_guruh_nomi} guruhiga yoziladi):",
+        reply_markup=keyboards.matn_kiritish_klaviaturasi(),
+    )
     await state.set_state(TalabaQoshish.ism_kiritish)

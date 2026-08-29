@@ -117,6 +117,13 @@ async def talaba_qidirish(ism_qismi: str) -> list[dict]:
     return [{"id": p["id"], "ism": _title_matni(p, "Ism")} for p in sahifalar]
 
 
+async def telegram_id_boyicha_qidirish(telegram_id: str) -> list[dict]:
+    """Telegram ID bo'yicha aniq moslikda talabalarni qidiradi: [{'id', 'ism'}]"""
+    filter_obj = {"property": "Telegram ID", "rich_text": {"equals": str(telegram_id)}}
+    sahifalar = await _query(DS_TALABALAR, filter_obj)
+    return [{"id": p["id"], "ism": _title_matni(p, "Ism")} for p in sahifalar]
+
+
 # ---------- Yozish (create) ----------
 
 async def talaba_yaratish(ism: str, telegram_id) -> str:
