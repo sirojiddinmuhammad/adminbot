@@ -7,13 +7,15 @@ BEKOR_TUGMASI = InlineKeyboardButton(text="❌ Bekor qilish", callback_data="bek
 ORQAGA_TUGMASI = InlineKeyboardButton(text="⬅️ Orqaga", callback_data="orqaga")
 
 YANGI_TALABA_MATNI = "➕ Yangi talaba"
+GURUHLAR_MATNI = "📊 Guruhlar"
 
 
 def asosiy_pastki_klaviatura() -> ReplyKeyboardMarkup:
-    """Xabar yozish maydoni ustida doimiy turadigan tugma."""
+    """Xabar yozish maydoni ustida doimiy turadigan tugmalar."""
     kb = ReplyKeyboardBuilder()
     kb.button(text=YANGI_TALABA_MATNI)
-    kb.adjust(1)
+    kb.button(text=GURUHLAR_MATNI)
+    kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
 
 
@@ -147,4 +149,68 @@ def duplikat_ism_klaviaturasi(royxat: list[dict]) -> InlineKeyboardMarkup:
     kb.adjust(5)
     kb.row(InlineKeyboardButton(text="✅ Baribir yangi qo'shish", callback_data="duplikat:baribir_yangi"))
     kb.row(ORQAGA_TUGMASI, BEKOR_TUGMASI)
+    return kb.as_markup()
+
+
+# =========================================================
+# Guruhlar hisoboti
+# =========================================================
+
+def hisobot_fork_klaviaturasi() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📚 Kurs bo'yicha", callback_data="hisobot:kurs")
+    kb.button(text="👨‍🏫 Ustoz bo'yicha", callback_data="hisobot:ustoz")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def kurslar_klaviaturasi(kurslar: list[str]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for i, _ in enumerate(kurslar):
+        kb.add(InlineKeyboardButton(text=str(i + 1), callback_data=f"hkurs:{i}"))
+    kb.adjust(5)
+    kb.row(InlineKeyboardButton(text="🔙 Orqaga", callback_data="hisobot_fork"))
+    return kb.as_markup()
+
+
+def kurslar_matni(kurslar: list[str]) -> str:
+    qatorlar = ["📚 Kursni tanlang:", ""]
+    for i, kurs in enumerate(kurslar, start=1):
+        qatorlar.append(f"{i}. {kurs}")
+    return "\n".join(qatorlar)
+
+
+def hisobot_royxat_klaviaturasi(
+    royxat: list[dict], sahifa: int, callback_prefiks: str, sahifalash_prefiksi: str
+) -> InlineKeyboardMarkup:
+    """Guruhlar hisoboti uchun raqamli ro'yxat (Talaba qo'shish oqimidan mustaqil)."""
+    boshlanish = sahifa * SAHIFA_HAJMI
+    tugash = boshlanish + SAHIFA_HAJMI
+    joriy_sahifa = royxat[boshlanish:tugash]
+
+    kb = InlineKeyboardBuilder()
+    for i, _ in enumerate(joriy_sahifa, start=1):
+        indeks = boshlanish + i - 1
+        kb.add(InlineKeyboardButton(text=str(i), callback_data=f"{callback_prefiks}:{indeks}"))
+    kb.adjust(5)
+
+    navigatsiya = []
+    if sahifa > 0:
+        navigatsiya.append(
+            InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"{sahifalash_prefiksi}:{sahifa - 1}")
+        )
+    if tugash < len(royxat):
+        navigatsiya.append(
+            InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"{sahifalash_prefiksi}:{sahifa + 1}")
+        )
+    if navigatsiya:
+        kb.row(*navigatsiya)
+
+    kb.row(InlineKeyboardButton(text="🔙 Orqaga", callback_data="hisobot_fork"))
+    return kb.as_markup()
+
+
+def hisobot_yakun_klaviaturasi() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔙 Menyu", callback_data="hisobot_fork")
     return kb.as_markup()

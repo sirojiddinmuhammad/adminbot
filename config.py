@@ -22,3 +22,12 @@ DS_YOZILISHLAR = "83a9b84e-2ef0-4d9f-906e-a7584b702d4e"
 DS_TOLOVLAR = "cf832f9b-0b30-430f-bc6a-7ca6c3f3bc02"
 
 SAHIFA_HAJMI = 10  # raqamli tugmalar ro'yxatidagi elementlar soni
+
+KURSLAR = [
+    "FONETIKA-TAJVID",
+    "Qur'on tas'hih va hifz",
+    "Muxtasar hifz",
+    "Arab tili",
+    "INDIVIDUAL",
+    "KIDS",
+]

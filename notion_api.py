@@ -161,3 +161,68 @@ async def tolov_yaratish(talaba_id: str, talaba_ism: str, summa: float) -> str:
         "To'lov sanasi": {"date": {"start": sana}},
     }
     return await _sahifa_yarat(DS_TOLOVLAR, props)
+
+
+# ---------- Guruhlar hisoboti (faqat o'qish) ----------
+
+def _guruh_malumotlari(page: dict) -> dict:
+    props = page.get("properties", {})
+    dars_kunlari = [o.get("name") for o in props.get("Dars kunlari", {}).get("multi_select", [])]
+    dars_vaqti_prop = props.get("Dars vaqti", {}).get("select")
+    dars_vaqti = dars_vaqti_prop["name"] if dars_vaqti_prop else None
+    ustoz_rel = props.get("Ustoz", {}).get("relation", [])
+    ustoz_id = ustoz_rel[0]["id"] if ustoz_rel else None
+    oylik = props.get("Oylik to'lov", {}).get("number")
+    return {
+        "id": page["id"],
+        "nomi": _title_matni(page, "Guruh nomi"),
+        "dars_kunlari": dars_kunlari,
+        "dars_vaqti": dars_vaqti,
+        "ustoz_id": ustoz_id,
+        "oylik_tolov": oylik,
+    }
+
+
+async def kurs_boyicha_faol_guruhlar(kurs: str) -> list[dict]:
+    """Berilgan Kurs bo'yicha Faol guruhlar, to'liq ma'lumot bilan."""
+    filter_obj = {
+        "and": [
+            {"property": "Kurs", "select": {"equals": kurs}},
+            {"property": "Guruh holati", "status": {"equals": "Faol"}},
+        ]
+    }
+    sorts = [{"property": "Guruh nomi", "direction": "ascending"}]
+    sahifalar = await _query(DS_GURUHLAR, filter_obj, sorts)
+    return [_guruh_malumotlari(p) for p in sahifalar]
+
+
+async def ustoz_faol_guruhlari_toliq(ustoz_id: str) -> list[dict]:
+    """Berilgan ustozning Faol guruhlari, to'liq ma'lumot bilan."""
+    filter_obj = {
+        "and": [
+            {"property": "Ustoz", "relation": {"contains": ustoz_id}},
+            {"property": "Guruh holati", "status": {"equals": "Faol"}},
+        ]
+    }
+    sorts = [{"property": "Guruh nomi", "direction": "ascending"}]
+    sahifalar = await _query(DS_GURUHLAR, filter_obj, sorts)
+    return [_guruh_malumotlari(p) for p in sahifalar]
+
+
+async def barcha_ustozlar_lugati() -> dict:
+    """id -> ism, ustoz holatidan qat'iy nazar (hisobotda ism ko'rsatish uchun)."""
+    sahifalar = await _query(DS_USTOZLAR)
+    return {p["id"]: _title_matni(p, "Ism") for p in sahifalar}
+
+
+async def faol_yozilishlar_soni_guruh_boyicha() -> dict:
+    """Har bir guruh uchun 'O'qiyabdi' holatidagi yozilishlar soni: {guruh_id: son}"""
+    filter_obj = {"property": "Holat", "select": {"equals": "O'qiyabdi"}}
+    sahifalar = await _query(DS_YOZILISHLAR, filter_obj)
+    hisob: dict = {}
+    for p in sahifalar:
+        for rel in p.get("properties", {}).get("Guruh", {}).get("relation", []):
+            gid = rel.get("id")
+            if gid:
+                hisob[gid] = hisob.get(gid, 0) + 1
+    return hisob
