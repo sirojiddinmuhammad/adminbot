@@ -165,6 +165,12 @@ async def tolov_yaratish(talaba_id: str, talaba_ism: str, summa: float) -> str:
 
 # ---------- Guruhlar hisoboti (faqat o'qish) ----------
 
+def _matn_xossasi(page: dict, prop_nomi: str) -> str:
+    prop = page.get("properties", {}).get(prop_nomi, {})
+    qismlar = prop.get("rich_text", [])
+    return "".join(q.get("plain_text", "") for q in qismlar)
+
+
 def _guruh_malumotlari(page: dict) -> dict:
     props = page.get("properties", {})
     dars_kunlari = [o.get("name") for o in props.get("Dars kunlari", {}).get("multi_select", [])]
@@ -180,6 +186,7 @@ def _guruh_malumotlari(page: dict) -> dict:
         "dars_vaqti": dars_vaqti,
         "ustoz_id": ustoz_id,
         "oylik_tolov": oylik,
+        "link": _matn_xossasi(page, "Guruh Link"),
     }
 
 

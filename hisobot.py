@@ -30,6 +30,8 @@ def _guruh_blokini_tuz(i: int, guruh: dict, ustoz_lugati: dict, yozilishlar_soni
     soni = yozilishlar_soni.get(guruh["id"], 0)
     qatorlar.append(f"👥 O'quvchilar: {soni}")
     qatorlar.append(f"💰 Narx: {_summa_matni(guruh['oylik_tolov'])}")
+    if guruh.get("link"):
+        qatorlar.append(f"🔗 Link: {guruh['link']}")
     return "\n".join(qatorlar)
 
 
