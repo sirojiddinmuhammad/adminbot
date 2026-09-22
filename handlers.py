@@ -684,6 +684,7 @@ async def xulosa_tasdiqlandi(callback: CallbackQuery, state: FSMContext) -> None
 
     songi_guruh_id = None
     songi_guruh_nomi = None
+    muvaffaqiyatli_guruhlar = []
 
     for y in data.get("yozilishlar", []):
         try:
@@ -693,6 +694,7 @@ async def xulosa_tasdiqlandi(callback: CallbackQuery, state: FSMContext) -> None
             await message.answer(f"✅ {y['guruh_nomi']} guruhiga yozildi")
             songi_guruh_id = y["guruh_id"]
             songi_guruh_nomi = y["guruh_nomi"]
+            muvaffaqiyatli_guruhlar.append((y["guruh_id"], y["guruh_nomi"]))
         except Exception as xato:
             await message.answer(
                 f"⚠️ {y['guruh_nomi']} uchun Yozilish yaratilmadi: {xato}\n"
@@ -710,7 +712,24 @@ async def xulosa_tasdiqlandi(callback: CallbackQuery, state: FSMContext) -> None
                     "Yozilish saqlangan, to'lovni qo'lda kiriting."
                 )
 
-    await message.answer("🎉 Jarayon yakunlandi.")
+    yakun_matni = "🎉 Jarayon yakunlandi."
+    havolalar = []
+    for guruh_id, guruh_nomi in muvaffaqiyatli_guruhlar:
+        try:
+            link = await notion_api.guruh_linkini_olish(guruh_id)
+        except Exception:
+            link = ""
+        if link:
+            havolalar.append((guruh_nomi, link))
+
+    if len(havolalar) == 1:
+        yakun_matni += f"\n\n🔗 Guruh havolasi:\n{havolalar[0][1]}"
+    elif len(havolalar) > 1:
+        yakun_matni += "\n\n🔗 Guruh havolalari:\n" + "\n".join(
+            f"{nomi}: {link}" for nomi, link in havolalar
+        )
+
+    await message.answer(yakun_matni)
 
     await state.update_data(
         shu_guruh_id=songi_guruh_id, shu_guruh_nomi=songi_guruh_nomi, qadam_tarixi=[]

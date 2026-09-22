@@ -117,6 +117,19 @@ async def talaba_qidirish(ism_qismi: str) -> list[dict]:
     return [{"id": p["id"], "ism": _title_matni(p, "Ism")} for p in sahifalar]
 
 
+async def _sahifa_olish(page_id: str) -> dict:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(f"{NOTION_API_BASE}/pages/{page_id}", headers=HEADERS)
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def guruh_linkini_olish(guruh_id: str) -> str:
+    """Guruh sahifasidagi 'Guruh Link' matnini qaytaradi (bo'sh bo'lsa '')."""
+    sahifa = await _sahifa_olish(guruh_id)
+    return _matn_xossasi(sahifa, "Guruh Link")
+
+
 async def telegram_id_boyicha_qidirish(telegram_id: str) -> list[dict]:
     """Telegram ID bo'yicha aniq moslikda talabalarni qidiradi: [{'id', 'ism'}]"""
     filter_obj = {"property": "Telegram ID", "rich_text": {"equals": str(telegram_id)}}
