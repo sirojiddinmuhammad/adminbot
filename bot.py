@@ -10,6 +10,7 @@ from aiogram.types import BotCommand
 from config import ADMIN_ID, BOT_TOKEN
 from handlers import router
 from hisobot import router as hisobot_router
+from ustozlar import router as ustozlar_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -32,9 +33,12 @@ async def main() -> None:
     router.callback_query.filter(F.from_user.id == ADMIN_ID)
     hisobot_router.message.filter(F.from_user.id == ADMIN_ID)
     hisobot_router.callback_query.filter(F.from_user.id == ADMIN_ID)
+    ustozlar_router.message.filter(F.from_user.id == ADMIN_ID)
+    ustozlar_router.callback_query.filter(F.from_user.id == ADMIN_ID)
 
     dp.include_router(router)
     dp.include_router(hisobot_router)
+    dp.include_router(ustozlar_router)
 
     await bot.delete_webhook(drop_pending_updates=True)
     await _buyruqlar_menyusini_ornat(bot)

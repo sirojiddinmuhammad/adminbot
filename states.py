@@ -14,3 +14,8 @@ class TalabaQoshish(StatesGroup):
     yana_guruh = State()          # "Yana guruhga yozamizmi?"
     xulosa_tasdiq = State()       # Yakuniy tasdiqlash
     keyingi_talaba = State()      # Saqlangandan keyin "Yana talaba qo'shamizmi?"
+
+
+class OylikBerish(StatesGroup):
+    summa_kutish = State()   # Oylik summasi
+    sana_kutish = State()    # Bugun/Kecha yoki qo'lda

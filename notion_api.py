@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -42,6 +42,11 @@ def sana_ozbekcha(iso_sana: str) -> str:
     """'2026-08-25' -> '25.08.2026'"""
     dt = datetime.strptime(iso_sana, "%Y-%m-%d")
     return dt.strftime("%d.%m.%Y")
+
+
+def kecha() -> str:
+    """Asia/Tashkent bo'yicha kechagi sana, ISO (YYYY-MM-DD) formatda."""
+    return (datetime.now(TASHKENT_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 # ---------- Ichki yordamchilar ----------
@@ -246,3 +251,69 @@ async def faol_yozilishlar_soni_guruh_boyicha() -> dict:
             if gid:
                 hisob[gid] = hisob.get(gid, 0) + 1
     return hisob
+
+
+# ---------- Ustozlar paneli: moliya, darslar, oyliklar ----------
+
+async def ustoz_moliyaviy_malumot(ustoz_id: str) -> dict:
+    """Ustoz sahifasidagi tayyor formula/rollup'larni o'qiydi: balans, ishlab topgan, olingan oyliklar."""
+    sahifa = await _sahifa_olish(ustoz_id)
+    props = sahifa.get("properties", {})
+
+    balans = props.get("Ustoz balansi", {}).get("formula", {}).get("number")
+    ishlab_topgani = props.get("Ishlab topgani", {}).get("rollup", {}).get("number")
+    berilgan_oyliklar = props.get("Berilgan oyliklar", {}).get("rollup", {}).get("number")
+
+    return {
+        "balans": balans or 0,
+        "ishlab_topgani": ishlab_topgani or 0,
+        "berilgan_oyliklar": berilgan_oyliklar or 0,
+    }
+
+
+async def darslar_soni(guruh_idlari: list[str], holat: str) -> int:
+    """Berilgan guruhlar ro'yxatida, belgilangan Holat'dagi darslar soni."""
+    if not guruh_idlari:
+        return 0
+    or_filtri = [{"property": "Guruh", "relation": {"contains": gid}} for gid in guruh_idlari]
+    filter_obj = {"and": [{"or": or_filtri}, {"property": "Holat", "select": {"equals": holat}}]}
+    sahifalar = await _query(DS_DARSLAR_GRAFIGI, filter_obj)
+    return len(sahifalar)
+
+
+async def belgilanmagan_otgan_darslar(guruh_idlari: list[str]) -> list[dict]:
+    """Muddati o'tgan (bugungacha), lekin hali Holat = 'Belgilanmagan' darslar."""
+    if not guruh_idlari:
+        return []
+    or_filtri = [{"property": "Guruh", "relation": {"contains": gid}} for gid in guruh_idlari]
+    filter_obj = {
+        "and": [
+            {"or": or_filtri},
+            {"property": "Holat", "select": {"equals": "Belgilanmagan"}},
+            {"property": "Rejadagi sana", "date": {"on_or_before": bugun()}},
+        ]
+    }
+    sorts = [{"property": "Rejadagi sana", "direction": "ascending"}]
+    sahifalar = await _query(DS_DARSLAR_GRAFIGI, filter_obj, sorts)
+
+    natija = []
+    for p in sahifalar:
+        props = p.get("properties", {})
+        sana_prop = props.get("Rejadagi sana", {}).get("date")
+        sana = sana_prop["start"][:10] if sana_prop and sana_prop.get("start") else None
+        dars_raqami = props.get("Dars raqami", {}).get("number")
+        guruh_rel = props.get("Guruh", {}).get("relation", [])
+        guruh_id = guruh_rel[0]["id"] if guruh_rel else None
+        natija.append({"id": p["id"], "sana": sana, "dars_raqami": dars_raqami, "guruh_id": guruh_id})
+    return natija
+
+
+async def oylik_yaratish(ustoz_id: str, summa: float, sana: str) -> str:
+    """Oyliklar bazasiga yozuv qo'shadi."""
+    props = {
+        "Nomi": {"title": [{"text": {"content": f"Oylik: {int(summa)} — {sana_ozbekcha(sana)}"}}]},
+        "Ustoz": {"relation": [{"id": ustoz_id}]},
+        "Summa": {"number": summa},
+        "Sana": {"date": {"start": sana}},
+    }
+    return await _sahifa_yarat(DS_OYLIKLAR, props)

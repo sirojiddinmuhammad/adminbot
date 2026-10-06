@@ -8,6 +8,7 @@ ORQAGA_TUGMASI = InlineKeyboardButton(text="⬅️ Orqaga", callback_data="orqag
 
 YANGI_TALABA_MATNI = "➕ Yangi talaba"
 GURUHLAR_MATNI = "📊 Guruhlar"
+USTOZLAR_MATNI = "👨‍🏫 Ustozlar"
 
 
 def asosiy_pastki_klaviatura() -> ReplyKeyboardMarkup:
@@ -15,6 +16,7 @@ def asosiy_pastki_klaviatura() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
     kb.button(text=YANGI_TALABA_MATNI)
     kb.button(text=GURUHLAR_MATNI)
+    kb.button(text=USTOZLAR_MATNI)
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
 
@@ -213,4 +215,58 @@ def hisobot_royxat_klaviaturasi(
 def hisobot_yakun_klaviaturasi() -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="🔙 Menyu", callback_data="hisobot_fork")
+    return kb.as_markup()
+
+
+# =========================================================
+# Ustozlar paneli
+# =========================================================
+
+def ustoz_panel_royxat_klaviaturasi(royxat: list[dict], sahifa: int) -> InlineKeyboardMarkup:
+    """Ustozlar paneli uchun raqamli ro'yxat — orqaga tugmasi ro'yxatning o'ziga qaytadi."""
+    boshlanish = sahifa * SAHIFA_HAJMI
+    tugash = boshlanish + SAHIFA_HAJMI
+    joriy_sahifa = royxat[boshlanish:tugash]
+
+    kb = InlineKeyboardBuilder()
+    for i, _ in enumerate(joriy_sahifa, start=1):
+        indeks = boshlanish + i - 1
+        kb.add(InlineKeyboardButton(text=str(i), callback_data=f"ustoz_panel:{indeks}"))
+    kb.adjust(5)
+
+    navigatsiya = []
+    if sahifa > 0:
+        navigatsiya.append(
+            InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"ustoz_panel_sahifa:{sahifa - 1}")
+        )
+    if tugash < len(royxat):
+        navigatsiya.append(
+            InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"ustoz_panel_sahifa:{sahifa + 1}")
+        )
+    if navigatsiya:
+        kb.row(*navigatsiya)
+
+    return kb.as_markup()
+
+
+def ustoz_paneli_klaviaturasi(ustoz_idx: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="💵 Oylik berish", callback_data=f"oylik_berish:{ustoz_idx}")
+    kb.adjust(1)
+    kb.row(InlineKeyboardButton(text="🔙 Ustozlar ro'yxati", callback_data="ustozlar_royxati"))
+    return kb.as_markup()
+
+
+def oylik_bekor_klaviaturasi() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="❌ Bekor qilish", callback_data="oylik_bekor")
+    return kb.as_markup()
+
+
+def oylik_sana_klaviaturasi() -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📅 Bugun", callback_data="oylik_sana:bugun")
+    kb.button(text="📅 Kecha", callback_data="oylik_sana:kecha")
+    kb.adjust(2)
+    kb.row(InlineKeyboardButton(text="❌ Bekor qilish", callback_data="oylik_bekor"))
     return kb.as_markup()
