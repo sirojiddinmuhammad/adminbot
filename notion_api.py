@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 import httpx
 
 from config import (
+    DS_DARSLAR_GRAFIGI,
     DS_GURUHLAR,
+    DS_OYLIKLAR,
     DS_TALABALAR,
     DS_TOLOVLAR,
     DS_USTOZLAR,
