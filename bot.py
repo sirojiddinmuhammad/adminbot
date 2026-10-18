@@ -11,6 +11,8 @@ from config import ADMIN_ID, BOT_TOKEN
 from handlers import router
 from hisobot import router as hisobot_router
 from ustozlar import router as ustozlar_router
+from kk import router as kk_router
+from talaba_holati import router as talaba_holati_router
 
 logging.basicConfig(level=logging.INFO)
 
@@ -36,9 +38,18 @@ async def main() -> None:
     ustozlar_router.message.filter(F.from_user.id == ADMIN_ID)
     ustozlar_router.callback_query.filter(F.from_user.id == ADMIN_ID)
 
+    talaba_holati_router.message.filter(F.from_user.id == ADMIN_ID)
+    talaba_holati_router.callback_query.filter(F.from_user.id == ADMIN_ID)
+
+    # talaba_holati birinchi ulanadi: "🎓 Talaba holati" tugmasi boshqa oqim
+    # (masalan Yangi talaba) o'rtasida bosilsa ham ishlashi uchun
+    dp.include_router(talaba_holati_router)
     dp.include_router(router)
     dp.include_router(hisobot_router)
     dp.include_router(ustozlar_router)
+    # kk_router'ga ADMIN_ID filtri qo'yilmaydi: admin bo'lmaganlarga
+    # "Ruxsat yo'q" javobi handler ichida beriladi
+    dp.include_router(kk_router)
 
     await bot.delete_webhook(drop_pending_updates=True)
     await _buyruqlar_menyusini_ornat(bot)

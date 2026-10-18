@@ -9,6 +9,7 @@ ORQAGA_TUGMASI = InlineKeyboardButton(text="⬅️ Orqaga", callback_data="orqag
 YANGI_TALABA_MATNI = "➕ Yangi talaba"
 GURUHLAR_MATNI = "📊 Guruhlar"
 USTOZLAR_MATNI = "👨‍🏫 Ustozlar"
+TALABA_HOLATI_MATNI = "🎓 Talaba holati"
 
 
 def asosiy_pastki_klaviatura() -> ReplyKeyboardMarkup:
@@ -17,6 +18,7 @@ def asosiy_pastki_klaviatura() -> ReplyKeyboardMarkup:
     kb.button(text=YANGI_TALABA_MATNI)
     kb.button(text=GURUHLAR_MATNI)
     kb.button(text=USTOZLAR_MATNI)
+    kb.button(text=TALABA_HOLATI_MATNI)
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
 

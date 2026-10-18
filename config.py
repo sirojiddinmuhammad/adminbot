@@ -22,6 +22,7 @@ DS_YOZILISHLAR = "83a9b84e-2ef0-4d9f-906e-a7584b702d4e"
 DS_TOLOVLAR = "cf832f9b-0b30-430f-bc6a-7ca6c3f3bc02"
 DS_DARSLAR_GRAFIGI = "d72512cc-8544-40d5-91af-0703a789cf01"
 DS_OYLIKLAR = "60fcb464-f409-458a-b630-79585f56fae6"
+DS_DAVOMAT = "425e5738-e16f-4d32-9f64-05002fa4fda6"
 
 SAHIFA_HAJMI = 10  # raqamli tugmalar ro'yxatidagi elementlar soni
 

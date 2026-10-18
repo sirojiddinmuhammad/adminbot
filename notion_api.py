@@ -1,9 +1,11 @@
+import asyncio
 from datetime import datetime, timedelta
 
 import httpx
 
 from config import (
     DS_DARSLAR_GRAFIGI,
+    DS_DAVOMAT,
     DS_GURUHLAR,
     DS_OYLIKLAR,
     DS_TALABALAR,
@@ -319,3 +321,158 @@ async def oylik_yaratish(ustoz_id: str, summa: float, sana: str) -> str:
         "Sana": {"date": {"start": sana}},
     }
     return await _sahifa_yarat(DS_OYLIKLAR, props)
+
+
+# ---------- "Ketma-ket kelmadi" tugmalari (Yozilish holatini o'zgartirish) ----------
+
+class NotionXato(Exception):
+    """Notion so'rovi muvaffaqiyatsiz bo'lganda, aniq xabar bilan."""
+
+    def __init__(self, matn: str, status: int | None = None):
+        super().__init__(matn)
+        self.status = status
+
+
+def _xato_matni(resp: httpx.Response) -> str:
+    try:
+        xabar = resp.json().get("message", resp.text)
+    except Exception:
+        xabar = resp.text
+    return f"{resp.status_code}: {xabar}"[:500]
+
+
+async def yozilishni_olish(page_id: str) -> dict:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.get(f"{NOTION_API_BASE}/pages/{page_id}", headers=HEADERS)
+    if resp.status_code != 200:
+        raise NotionXato(_xato_matni(resp), resp.status_code)
+    return resp.json()
+
+
+async def _sahifani_yangilash(page_id: str, properties: dict) -> None:
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.patch(
+            f"{NOTION_API_BASE}/pages/{page_id}", headers=HEADERS, json={"properties": properties}
+        )
+    if resp.status_code != 200:
+        raise NotionXato(_xato_matni(resp), resp.status_code)
+
+
+async def yozilishni_davom_ettirish(page_id: str) -> None:
+    """Holat: Ta'tilda -> O'qiyabdi"""
+    await _sahifani_yangilash(page_id, {"Holat": {"select": {"name": "O'qiyabdi"}}})
+
+
+async def yozilishni_tugatish(page_id: str, sabab: str) -> None:
+    """Holat -> Tugatdi, Tugagan sana = bugun (Toshkent), Izoh'ga sabab qo'shiladi."""
+    sahifa = await yozilishni_olish(page_id)
+    eski_izoh = _matn_xossasi(sahifa, "Izoh")
+    sana = bugun()
+    yangi_qator = f"Admin chiqardi ({sana}): {sabab}" if sabab else f"Admin chiqardi ({sana})"
+    izoh = f"{eski_izoh}\n{yangi_qator}" if eski_izoh else yangi_qator
+    if len(izoh) > 1900:
+        izoh = izoh[-1900:]  # eng yangi yozuv saqlanib qoladi
+    await _sahifani_yangilash(
+        page_id,
+        {
+            "Holat": {"select": {"name": "Tugatdi"}},
+            "Tugagan sana": {"date": {"start": sana}},
+            "Izoh": {"rich_text": [{"text": {"content": izoh}}]},
+        },
+    )
+
+
+# ---------- Talaba holati: yozilishlar, davomat, balans ----------
+
+async def _query_limit(data_source_id: str, filter_obj=None, sorts=None, limit: int = 5) -> list[dict]:
+    """Faqat birinchi `limit` ta natijani oladi (bitta so'rov)."""
+    url = f"{NOTION_API_BASE}/data_sources/{data_source_id}/query"
+    body: dict = {"page_size": limit}
+    if filter_obj:
+        body["filter"] = filter_obj
+    if sorts:
+        body["sorts"] = sorts
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(url, headers=HEADERS, json=body)
+        resp.raise_for_status()
+    return resp.json().get("results", [])
+
+
+def _formula_qiymati(page: dict, prop_nomi: str):
+    """Formula natijasini turidan qat'i nazar (number/string/boolean/date) qaytaradi."""
+    prop = page.get("properties", {}).get(prop_nomi, {})
+    formula = prop.get("formula") or {}
+    qiymat = formula.get(formula.get("type"))
+    if isinstance(qiymat, dict):  # date formulasi
+        return qiymat.get("start")
+    return qiymat
+
+
+async def talaba_balansi(talaba_id: str) -> dict:
+    """Talabalar bazasidagi tayyor formulalarni o'qiydi: Balans, Balans holati, Qarzga tushgan sana."""
+    sahifa = await _sahifa_olish(talaba_id)
+    qarz_sana = sahifa.get("properties", {}).get("Qarzga tushgan sana", {}).get("date")
+    return {
+        "balans": _formula_qiymati(sahifa, "Balans"),
+        "balans_holati": _formula_qiymati(sahifa, "Balans holati"),
+        "qarz_sana": qarz_sana["start"][:10] if qarz_sana and qarz_sana.get("start") else None,
+    }
+
+
+async def talaba_yozilishlari(talaba_id: str) -> list[dict]:
+    """Talabaning barcha yozilishlari: [{'id', 'holat', 'guruh_id', 'guruh_nomi'}]"""
+    filter_obj = {"property": "Talaba", "relation": {"contains": talaba_id}}
+    sahifalar = await _query(DS_YOZILISHLAR, filter_obj)
+
+    natija = []
+    for p in sahifalar:
+        props = p.get("properties", {})
+        holat_prop = props.get("Holat", {}).get("select")
+        guruh_rel = props.get("Guruh", {}).get("relation", [])
+        natija.append(
+            {
+                "id": p["id"],
+                "holat": holat_prop["name"] if holat_prop else None,
+                "guruh_id": guruh_rel[0]["id"] if guruh_rel else None,
+                "yozilish_nomi": _title_matni(p, "Nomi"),
+            }
+        )
+
+    async def guruh_nomi(y: dict) -> str:
+        if y["guruh_id"]:
+            try:
+                sahifa = await _sahifa_olish(y["guruh_id"])
+                return _title_matni(sahifa, "Guruh nomi")
+            except Exception:
+                pass
+        return y["yozilish_nomi"]
+
+    nomlar = await asyncio.gather(*[guruh_nomi(y) for y in natija])
+    for y, nomi in zip(natija, nomlar):
+        y["guruh_nomi"] = nomi
+    return natija
+
+
+async def yozilish_davomati(yozilish_id: str, soni: int = 5) -> list[dict]:
+    """Yozilish bo'yicha oxirgi `soni` ta davomat, yangisidan eskisiga: [{'sana', 'holat'}]"""
+    filter_obj = {"property": "Yozilish", "relation": {"contains": yozilish_id}}
+    sorts = [{"property": "Sana", "direction": "descending"}]
+    sahifalar = await _query_limit(DS_DAVOMAT, filter_obj, sorts, soni)
+
+    natija = []
+    for p in sahifalar:
+        props = p.get("properties", {})
+        sana = props.get("Sana", {}).get("date")
+        holat = props.get("Holat", {}).get("select")
+        natija.append(
+            {
+                "sana": sana["start"][:10] if sana and sana.get("start") else None,
+                "holat": holat["name"] if holat else None,
+            }
+        )
+    return natija
+
+
+async def yozilishni_tatilga_chiqarish(page_id: str) -> None:
+    """Holat: O'qiyabdi -> Ta'tilda"""
+    await _sahifani_yangilash(page_id, {"Holat": {"select": {"name": "Ta'tilda"}}})
