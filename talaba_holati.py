@@ -152,6 +152,7 @@ async def talaba_holati_boshlash(message: Message, state: FSMContext) -> None:
     StateFilter(TalabaHolati.ism_kutish, TalabaHolati.talaba_tanlash, TalabaHolati.karta),
     F.text,
     ~F.text.in_(MENYU_MATNLARI),
+    ~F.text.startswith("/"),  # /start va boshqa buyruqlar o'z handlerlariga o'tsin
 )
 async def ism_qidirish(message: Message, state: FSMContext) -> None:
     ism_qismi = (message.text or "").strip()
